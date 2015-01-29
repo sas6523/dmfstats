@@ -33,18 +33,23 @@ output: pdf_document
   if (!is.installed("grid")){
     install.packages("grid", repos="http://cran.rstudio.com/")
   }
+  # check if package "hydroGOF" is installed
+  if (!is.installed("plyr")){
+    install.packages("plyr", repos="http://cran.rstudio.com/")
+  }
 
-
+library("plyr")
 library("reshape2")
 library("dplyr")
 library("Cairo")
 library("ggplot2")
+library("knitr")
 # Grid allows use of units in the plot. eg. margin adjust by cm
 library("grid")
 #library("xtable")
 
-#setwd("C:/Users/Admin/Documents/Coursera Classes/dmfstats/")
-setwd("C:/Users/sasmith11/Documents/R Projects/dmfstats/dmfstats")
+setwd("C:/Users/Admin/Documents/Coursera Classes/dmfstats/")
+#setwd("C:/Users/sasmith11/Documents/R Projects/dmfstats/dmfstats")
 
 # currently, this is hard coded as atlantic bonito. The final version will read a csv of all species, and subset from there
 dat <- read.table("atlanticbonito.txt", sep="", header=FALSE)
@@ -117,6 +122,58 @@ Table 37. Atlantic bonito recerational catch in North Carolina by year.
 library(knitr)
 names(dat) <- c("Year", "Harvest Num", "PSE", "Harvest lbs", "PSE", "Mean Length", "Mean Weight", "PSE", "Released Num", "PSE")
 kable(dat, format = "markdown", caption="Table 37. Atlantic bonito recreational catch in North Carolina by year")
+#library("pander")
+#pandoc.table(dat)
+```
+
+```{r, echo=FALSE}
+
+states <- read.csv("states.csv", header=TRUE, sep=",", na.strings="-")
+stateAbbr <- read.csv("stateAbbr.csv", header=TRUE, sep=",")
+
+# Add R sensitive titles to the variables
+names(states) <- c("State", "Harvest_Number", "PSE_1", "Harvest_Pounds", "PSE_2", "Released_Number", "PSE_3", "Mean_Length", "Mean_Weight")
+# recreate states as a factor
+states$State <- as.factor(states$State)
+
+
+# Convert mergedstates df to long form
+# Select just the columns we plan on plotting
+tempstates <- select(states, State, Harvest_Number, Harvest_Pounds, Released_Number)
+# convert Harvest_Pounds to H_P/10^2 (REMOVE THIS WHEN WE FIGURE OUT HOW TO PLOT TWO GRAPHS ON ONE PLOT)
+tempstates$Harvest_Pounds <- tempstates$Harvest_Pounds / 10^2
+
+# convert the dataframe to long format (ggplot prefered)
+tidyStates <- melt(tempstates, id="State")
+# reassign tidyDat$value as integer. First you must replace the comma e.g. 9,234 = 9234
+tidyStates$value <- as.numeric(gsub(",","",tidyStates$value))
+
+# join both data sets to supplement states names with states abbreviations
+mergedStates <- join(tidyStates, stateAbbr, by = "State")
+# Remove the states names variable for plotting. (we plot just the abbreviations)
+mergedStates <- mergedStates[,2:4]
+# Rename the df so abbreviation becomes state
+names(mergedStates) <- c("variable", "value", "State")
+```
+
+```{r, barrplot, echo=FALSE, fig.width=8, fig.height=4, results='hide', warning=FALSE}
+#png('AtlanticBonito2.png', height=480, width=700)
+# The Cairo library produces nice, smooth graphics
+Cairo(600, 300, file="./bar.png", type="png", bg="transparent")
+plot <- ggplot(mergedStates, aes(State, value, fill=variable)) +
+        geom_bar(stat="identity",position=position_dodge(), colour="black") + # When the data contains y values in a column, use stat="identity"        
+        scale_fill_manual(values=c("steelblue4", "black", "yellow2")) +
+        theme_bw() + # sets theme to black and white. Although, there is a lot of grey in this? Wtf is that all about?        
+        labs(x="State", y="Number") 
+print(plot)
+dev.off()
+```
+Figure 10. Atlantic bonito recreational catch by state, 2013.
+
+Table 38. Atlantic bonito recreational catch by state, 2013.
+```{r, echo=FALSE, results='asis', warning=FALSE}
+names(states) <- c("State", "Harvest Num", "PSE", "Harvest lbs", "PSE", "Released Num", "PSE", "Mean Length", "Mean Weight")
+kable(states, format = "markdown", caption="Table 38. Atlantic bonito recreational catch by state, 2013.")
 #library("pander")
 #pandoc.table(dat)
 ```
